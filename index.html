@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notepad DApp</title>
+    <script src="https://cdn.jsdelivr.net/npm/web3@1.7.3/dist/web3.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col items-center p-4">
+    <div class="w-full max-w-2xl bg-white rounded-lg shadow-md p-6">
+        <h1 class="text-2xl font-bold mb-4 text-center">Notepad DApp</h1>
+        
+        <!-- Wallet Connection -->
+        <div class="mb-6">
+            <button id="connectWallet" class="w-full bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600">
+                Connect Wallet
+            </button>
+            <p id="account" class="mt-2 text-sm text-gray-600"></p>
+        </div>
+
+        <!-- Create File -->
+        <div class="mb-6">
+            <h2 class="text-lg font-semibold mb-2">Create File</h2>
+            <input id="createId" type="number" placeholder="File ID" class="w-full p-2 mb-2 border rounded">
+            <textarea id="createContent" placeholder="File Content" class="w-full p-2 mb-2 border rounded" rows="4"></textarea>
+            <button id="createFile" class="w-full bg-green-500 text-white py-2 px-4 rounded hover:bg-green-600">
+                Create File
+            </button>
+        </div>
+
+        <!-- Update File -->
+        <div class="mb-6">
+            <h2 class="text-lg font-semibold mb-2">Update File</h2>
+            <input id="updateId" type="number" placeholder="File ID" class="w-full p-2 mb-2 border rounded">
+            <textarea id="updateContent" placeholder="New Content" class="w-full p-2 mb-2 border rounded" rows="4"></textarea>
+            <button id="updateFile" class="w-full bg-yellow-500 text-white py-2 px-4 rounded hover:bg-yellow-600">
+                Update File
+            </button>
+        </div>
+
+        <!-- Get File -->
+        <div class="mb-6">
+            <h2 class="text-lg font-semibold mb-2">Get File</h2>
+            <input id="getId" type="number" placeholder="File ID" class="w-full p-2 mb-2 border rounded">
+            <button id="getFile" class="w-full bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600">
+                Get File
+            </button>
+            <div id="fileDetails" class="mt-2 text-sm text-gray-600"></div>
+        </div>
+
+        <!-- Document Count -->
+        <div class="mb-6">
+            <h2 class="text-lg font-semibold mb-2">Document Count</h2>
+            <button id="getDocCount" class="w-full bg-purple-500 text-white py-2 px-4 rounded hover:bg-purple-600">
+                Get Document Count
+            </button>
+            <p id="docCount" class="mt-2 text-sm text-gray-600"></p>
+        </div>
+
+        <!-- File IDs -->
+        <div class="mb-6">
+            <h2 class="text-lg font-semibold mb-2">List File IDs</h2>
+            <button id="getFileIds" class="w-full bg-indigo-500 text-white py-2 px-4 rounded hover:bg-indigo-600">
+                Get File IDs
+            </button>
+            <div id="fileIds" class="mt-2 text-sm text-gray-600"></div>
+        </div>
+    </div>
+
+    <script>
+        // Contract ABI
+        const contractABI = [
+            {
+                "anonymous": false,
+                "inputs": [
+                    {"indexed": true, "internalType": "uint256", "name": "id", "type": "uint256"},
+                    {"indexed": true, "internalType": "address", "name": "owner", "type": "address"},
+                    {"indexed": false, "internalType": "string", "name": "content", "type": "string"}
+                ],
+                "name": "FileCreated",
+                "type": "event"
+            },
+            {
+                "anonymous": false,
+                "inputs": [
+                    {"indexed": true, "internalType": "uint256", "name": "id", "type": "uint256"},
+                    {"indexed": true, "internalType": "address", "name": "owner", "type": "address"},
+                    {"indexed": false, "internalType": "string", "name": "content", "type": "string"}
+                ],
+                "name": "FileUpdated",
+                "type": "event"
+            },
+            {
+                "inputs": [
+                    {"internalType": "uint256", "name": "_id", "type": "uint256"},
+                    {"internalType": "string", "name": "_content", "type": "string"}
+                ],
+                "name": "createFile",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "getDocumentCount",
+                "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {"internalType": "uint256", "name": "_id", "type": "uint256"}
+                ],
+                "name": "getFile",
+                "outputs": [
+                    {"internalType": "uint256", "name": "", "type": "uint256"},
+                    {"internalType": "string", "name": "", "type": "string"},
+                    {"internalType": "address", "name": "", "type": "address"}
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "getFileIds",
+                "outputs": [{"internalType": "uint256[]", "name": "", "type": "uint256[]"}],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {"internalType": "uint256", "name": "_id", "type": "uint256"},
+                    {"internalType": "string", "name": "_content", "type": "string"}
+                ],
+                "name": "updateFile",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            }
+        ];
+
+        // Contract Address (Replace with your deployed contract address)
+        const contractAddress = "0x1a510f35692963C1eabE1e87BE71e9998Eff2154";
+
+        let web3;
+        let contract;
+        let account;
+
+        // Initialize Web3
+        async function initWeb3() {
+            if (window.ethereum) {
+                web3 = new Web3(window.ethereum);
+                try {
+                    await window.ethereum.request({ method: 'eth_requestAccounts' });
+                    contract = new web3.eth.Contract(contractABI, contractAddress);
+                    const accounts = await web3.eth.getAccounts();
+                    account = accounts[0];
+                    document.getElementById('account').innerText = `Connected: ${account}`;
+                    document.getElementById('connectWallet').innerText = 'Wallet Connected';
+                    document.getElementById('connectWallet').disabled = true;
+                } catch (error) {
+                    console.error("Wallet connection error:", error);
+                    alert("Failed to connect wallet");
+                }
+            } else {
+                alert("Please install MetaMask!");
+            }
+        }
+
+        // Connect Wallet
+        document.getElementById('connectWallet').addEventListener('click', initWeb3);
+
+        // Create File
+        document.getElementById('createFile').addEventListener('click', async () => {
+            const id = document.getElementById('createId').value;
+            const content = document.getElementById('createContent').value;
+            if (!id || !content) {
+                alert("Please provide both ID and content");
+                return;
+            }
+            try {
+                await contract.methods.createFile(id, content).send({ from: account });
+                alert("File created successfully!");
+                document.getElementById('createId').value = '';
+                document.getElementById('createContent').value = '';
+            } catch (error) {
+                console.error("Create file error:", error);
+                alert("Error creating file: " + error.message);
+            }
+        });
+
+        // Update File
+        document.getElementById('updateFile').addEventListener('click', async () => {
+            const id = document.getElementById('updateId').value;
+            const content = document.getElementById('updateContent').value;
+            if (!id || !content) {
+                alert("Please provide both ID and content");
+                return;
+            }
+            try {
+                await contract.methods.updateFile(id, content).send({ from: account });
+                alert("File updated successfully!");
+                document.getElementById('updateId').value = '';
+                document.getElementById('updateContent').value = '';
+            } catch (error) {
+                console.error("Update file error:", error);
+                alert("Error updating file: " + error.message);
+            }
+        });
+
+        // Get File
+        document.getElementById('getFile').addEventListener('click', async () => {
+            const id = document.getElementById('getId').value;
+            if (!id) {
+                alert("Please provide a file ID");
+                return;
+            }
+            try {
+                const file = await contract.methods.getFile(id).call();
+                document.getElementById('fileDetails').innerHTML = `
+                    <p><strong>ID:</strong> ${file[0]}</p>
+                    <p><strong>Content:</strong> ${file[1]}</p>
+                    <p><strong>Owner:</strong> ${file[2]}</p>
+                `;
+            } catch (error) {
+                console.error("Get file error:", error);
+                alert("Error retrieving file: " + error.message);
+            }
+        });
+
+        // Get Document Count
+        document.getElementById('getDocCount').addEventListener('click', async () => {
+            try {
+                const count = await contract.methods.getDocumentCount().call();
+                document.getElementById('docCount').innerText = `Total Documents: ${count}`;
+            } catch (error) {
+                console.error("Get document count error:", error);
+                alert("Error retrieving document count: " + error.message);
+            }
+        });
+
+        // Get File IDs
+        document.getElementById('getFileIds').addEventListener('click', async () => {
+            try {
+                const ids = await contract.methods.getFileIds().call();
+                document.getElementById('fileIds').innerHTML = `
+                    <p><strong>File IDs:</strong> ${ids.length > 0 ? ids.join(', ') : 'No files'}</p>
+                `;
+            } catch (error) {
+                console.error("Get file IDs error:", error);
+                alert("Error retrieving file IDs: " + error.message);
+            }
+        });
+    </script>
+</body>
+</html>
